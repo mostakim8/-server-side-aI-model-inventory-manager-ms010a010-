@@ -187,13 +187,10 @@ app.post('/models', verifyToken, async (req, res) => {
 
         newModelData.developerUid = req.user.uid; 
         
-        // 🔑 ফিক্স: যদি price ক্লায়েন্ট থেকে না আসে, তবে তা undefined হবে।
-        // সেই ক্ষেত্রে, এটিকে 0 এ সেট করা হলো (সার্ভারের ডিফল্ট ভ্যালু ব্যবহার করার জন্য)।
-        // অথবা, এটি অনুপস্থিত থাকলে parseFloat() কল করা এড়িয়ে চলুন।
+        
         if (newModelData.price !== undefined) {
              newModelData.price = parseFloat(newModelData.price);
         } else {
-             // যদি price ফিল্ডটি পাঠানো না হয়, তবে সার্ভার স্কিমার default: 0 ব্যবহার করবে। 
              delete newModelData.price; 
         }
 
@@ -206,8 +203,7 @@ app.post('/models', verifyToken, async (req, res) => {
     }
 });
 
-// 🔑 নতুন API endpoint: Full Purchase Transaction (MongoDB & Firestore Log)
-// ক্লায়েন্টের POST /purchase-model রিকোয়েস্টটিকে হ্যান্ডেল করার জন্য এটি তৈরি করা হলো।
+// new API endpoint: Full Purchase Transaction (MongoDB & Firestore Log)
 app.post('/purchase-model', verifyToken, async (req, res) => {
     try {
         const transactionData = req.body;
@@ -260,7 +256,6 @@ app.post('/purchase-model', verifyToken, async (req, res) => {
 });
 
 
-// CRITICAL FIX: New API endpoint for Model Purchase (Challenge 3)
 // This uses the $inc operator to atomically increase the 'purchased' counter.
 // NOTE: The new POST /purchase-model route above now handles this logic as well, 
 // but this PATCH route is kept for backward compatibility/direct counter update.
@@ -336,10 +331,9 @@ app.patch('/models/:id', verifyToken, async (req, res) => {
                 name: updatedData.modelName, // Sync name
                 description: updatedData.description,
                 
-                // 🛑 ফিক্স: price আপডেট করার সময় চেক করুন যে এটি undefined বা null কিনা।
                 price: updatedData.price !== undefined && updatedData.price !== null 
                        ? parseFloat(updatedData.price) 
-                       : existingModel.price, // যদি না আসে, তবে পুরোনো ভ্যালু রাখুন।
+                       : existingModel.price, 
                 
                 category: updatedData.category,
                 framework: updatedData.category, // Sync framework
