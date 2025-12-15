@@ -36,7 +36,7 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
 // Production URL কে পরিবেশের ভেরিয়েবল থেকে নেওয়ার জন্য আপডেট করা হয়েছে
 const allowedOrigins = [
     'http://localhost:5173', // লোকাল ফ্রন্টএন্ড 
-    "process.env.FRONTEND_URL", // Netlify/Vercel লাইভ ফ্রন্টএন্ড URL
+    process.env.FRONTEND_URL, // Netlify/Vercel লাইভ ফ্রন্টএন্ড URL
     'http://localhost:5176',
     'http://127.0.0.1:5173',
     'http://localhost:5175', 
