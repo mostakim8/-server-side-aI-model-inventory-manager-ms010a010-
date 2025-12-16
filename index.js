@@ -261,9 +261,14 @@ app.post('/purchase-model', verifyToken, async (req, res) => {
         
        
         const firestore = admin.firestore();
-        const appId = process.env.FIREBASE_APP_ID || 'default-app-id'; 
+        // const appId = process.env.FIREBASE_APP_ID || 'default-app-id'; 
+        const buyerUid=req.user.uid;
+
         const purchaseRef = firestore
-                            .collection(`artifacts/${appId}/users/${buyerUid}/purchases`)
+                            .collection(`purchase`)
+                            .doc(buyerUid)
+                            .collection('history')
+
                             .doc(); 
         
         const purchaseRecord = {
