@@ -9,12 +9,10 @@ dotenv.config();
 
 const app = express();
 
-
 let firebaseInitialized = false;
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     try {
-       
         const serviceAccountConfig = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccountConfig)
@@ -22,21 +20,16 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
         firebaseInitialized = true;
         console.log("Firebase Admin initialized from Environment Variables.");
     } catch (e) {
-        
-        console.error("Firebase Admin Initialization FAILED (Environment Variable Error):", e.message);
+        console.error("Firebase Admin Initialization FAILED:", e.message);
     }
 } else {
-    console.warn("WARNING: Firebase Admin not initialized. Missing FIREBASE_SERVICE_ACCOUNT env var.");
+    console.warn("WARNING: Firebase Admin not initialized.");
 }
 
-
-// 🌐 CORS Configuration (Deployment Friendly)
-
+// 🌐 CORS Configuration
 const allowedOrigins = [
     'http://localhost:5173',  
-    // Netlify/Vercel
     process.env.FRONTEND_URL,   
-    // frontend Url
     'http://localhost:5176',
     'http://127.0.0.1:5173',
     'http://localhost:5175', 
@@ -57,7 +50,6 @@ const corsOptions = {
     optionsSuccessStatus: 204
 };
 
-// Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
 
@@ -73,7 +65,6 @@ const verifyToken = async (req, res, next) => {
     }
     
     const token = authorization.split(' ')[1];
-
     try {
         const decodedToken = await admin.auth().verifyIdToken(token);
         req.user = decodedToken; 
@@ -84,13 +75,10 @@ const verifyToken = async (req, res, next) => {
     }
 };
 
-
-// MongoDB Connection & Updated Schema 
+// MongoDB Connection
 let isConnected = false;
-
 const connectDB = async () => { 
     if (isConnected) return; 
-
     try {
         await mongoose.connect(process.env.DB_URI || 'mongodb://localhost:27017/ai_models_db'); 
         isConnected = true;
@@ -98,37 +86,29 @@ const connectDB = async () => {
     } catch (error) {
         console.error("MongoDB connection failed:", error.message);
         isConnected = false;
-        // throw error; 
     }
 };
 
-// Mongoose Schema (unchanged)
+// Mongoose Schema
 const ModelSchema = new mongoose.Schema({
-    
     modelName: { type: String, required: true },
     category: { type: String, required: true },
-    
     name: { type: String, default: function() { return this.modelName; } }, 
     framework: { type: String, default: function() { return this.category; } }, 
-    
     useCase: { type: String, default: 'General AI' },
     dataset: { type: String, default: 'Proprietary Data' },
-    
     description: { type: String, required: true },
     imageUrl: { type: String, required: true },
-    
     developerEmail: { type: String, required: true },
     developerUid: { type: String, required: true }, 
-    developerName: { type: String, required: false }, 
-    
     purchased: { type: Number, default: 0 },
-    
     createdAt: { type: Date, default: Date.now } 
 });
 
 const AIModelOne = mongoose.model('AIModel', ModelSchema);
 
-//routes
+// --- Routes ---
+
 app.get('/', (req, res) => {
     res.send('AI Model Inventory Manager Server is running!');
 });
@@ -137,55 +117,13 @@ app.get('/models', async (req, res) => {
     await connectDB();
     try {
         let query = {};
-        let sort = {};
-
-        if (req.query.email) {
-            query.developerEmail = req.query.email;
-        }
-
-        if (req.query.category && req.query.category !== 'All') {
-            query.category = req.query.category;
-        }
+        if (req.query.email) query.developerEmail = req.query.email;
+        if (req.query.category && req.query.category !== 'All') query.category = req.query.category;
         
-        if (req.query.latest === 'true') {
-            // Newest first
-            sort.createdAt = -1; 
-        } else {
-            
-             sort.createdAt = -1;
-        }
-        
-        let modelsQuery = AIModelOne.find(query).sort(sort);
-
-        if (req.query.latest === 'true') {
-            modelsQuery = modelsQuery.limit(6);
-        }
-
-        const models = await modelsQuery.exec();
+        let models = await AIModelOne.find(query).sort({ createdAt: -1 }).exec();
         res.send(models);
     } catch (error) {
-        console.error("Error fetching models:", error);
         res.status(500).send({ message: "Failed to fetch models." });
-    }
-});
-
-app.get('/models/latest', async (req, res) => {
-    await connectDB();
-    try {
-      
-        const skipCount = parseInt(req.query.skip) || 0; 
-        const limit = parseInt(req.query.limit) || 6; 
-        
-        const latestModels = await AIModelOne.find({})
-            .sort({ createdAt: -1 }) 
-            .skip(skipCount)
-            .limit(limit)
-            .exec();
-            
-        res.status(200).json(latestModels);
-    } catch (error) {
-        console.error("Error fetching latest models:", error);
-        res.status(500).send({ message: "Failed to fetch latest models due to server error." });
     }
 });
 
@@ -193,48 +131,32 @@ app.get('/models/:id', async (req, res) => {
     await connectDB();
     try {
         const id = req.params.id;
-        if (!ObjectId.isValid(id)) {
-            return res.status(400).send({ message: "Invalid Model ID format." });
-        }
+        if (!ObjectId.isValid(id)) return res.status(400).send({ message: "Invalid ID." });
         const model = await AIModelOne.findById(id);
-        if (!model) {
-            return res.status(404).send({ message: "Model not found." });
-        }
+        if (!model) return res.status(404).send({ message: "Not found." });
         res.send(model);
     } catch (error) {
-        console.error("Error fetching single model:", error);
-        res.status(500).send({ message: "Failed to fetch model." });
+        res.status(500).send({ message: "Server error." });
     }
 });
-
 
 app.post('/models', verifyToken, async (req, res) => { 
     await connectDB();
     try {
         const newModelData = req.body;
-        
         if (newModelData.developerEmail !== req.user.email) {
-            return res.status(403).send({ message: "Forbidden: Developer email mismatch." });
+            return res.status(403).send({ message: "Email mismatch." });
         }
-
         newModelData.developerUid = req.user.uid; 
-        
-        
-        if (newModelData.price !== undefined) {
-             newModelData.price = parseFloat(newModelData.price);
-        } else {
-             delete newModelData.price; 
-        }
-
         const newModel = new AIModelOne(newModelData);
         const result = await newModel.save();
         res.status(201).send(result);
     } catch (error) {
-        console.error("Error creating model:", error.message);
-        res.status(400).send({ message: `Failed to create model: ${error.message}` });
+        res.status(400).send({ message: error.message });
     }
 });
 
+// 🛠️ সংশোধিত পারচেজ রুট (ডুপ্লিকেট প্রোটেকশন সহ)
 
 app.post('/purchase-model', verifyToken, async (req, res) => {
     await connectDB();
@@ -244,30 +166,33 @@ app.post('/purchase-model', verifyToken, async (req, res) => {
         const buyerUid = req.user.uid; 
         
         if (!ObjectId.isValid(modelId)) {
-            return res.status(400).send({ message: "Invalid Model ID format: The string did not match the expected pattern." });
+            return res.status(400).send({ message: "Invalid Model ID format." });
+        }
+
+        const firestore = admin.firestore();
+
+        // 🛡️ ডুপ্লিকেট চেক: Firestore এ আগে থেকে কেনা আছে কি না দেখা
+        const historyRef = firestore.collection('purchase').doc(buyerUid).collection('history');
+        const existingPurchase = await historyRef.where('modelId', '==', modelId).get();
+
+        if (!existingPurchase.empty) {
+            return res.status(400).send({ 
+                message: "Forbidden: You have already purchased this model once." 
+            });
         }
         
+        // MongoDB তে কাউন্টার আপডেট
         const mongoResult = await AIModelOne.updateOne(
             { _id: new ObjectId(modelId) },
             { $inc: { purchased: 1 } }
         );
 
         if (mongoResult.modifiedCount === 0) {
-            return res.status(404).send({ message: "Model not found or update failed." });
+            return res.status(404).send({ message: "Model not found." });
         }
         
-       
-        const firestore = admin.firestore();
-        // const appId = process.env.FIREBASE_APP_ID || 'default-app-id'; 
-        // const buyerUid=req.user.uid;
-
-        const purchaseRef = firestore
-                            .collection(`purchase`)
-                            .doc(buyerUid)
-                            .collection('history')
-
-                            .doc(); 
-        
+        // Firestore এ রেকর্ড সেভ
+        const purchaseRef = historyRef.doc(); 
         const purchaseRecord = {
             id: purchaseRef.id, 
             ...transactionData,
@@ -279,7 +204,7 @@ app.post('/purchase-model', verifyToken, async (req, res) => {
 
         res.send({ 
             acknowledged: true, 
-            message: `Purchase successful. Model count updated: ${mongoResult.modifiedCount}. Transaction logged.`,
+            message: "Purchase successful. Transaction logged.",
             purchaseRecord 
         });
 
@@ -289,102 +214,24 @@ app.post('/purchase-model', verifyToken, async (req, res) => {
     }
 });
 
-app.patch('/models/purchase/:id', verifyToken, async (req, res) => {
-    await connectDB();
-    try {
-        const id = req.params.id;
-        
-        if (!ObjectId.isValid(id)) {
-            return res.status(400).send({ message: "Invalid Model ID format." });
-        }
-
-        const result = await AIModelOne.updateOne(
-            { _id: new ObjectId(id) },
-            { $inc: { purchased: 1 } } 
-        );
-
-        if (result.modifiedCount === 0) {
-            
-            return res.status(404).send({ message: "Model not found or update failed." });
-        }
-        
-        res.send({ acknowledged: true, modifiedCount: result.modifiedCount, message: "Purchase counter updated successfully." });
-
-    } catch (error) {
-        console.error("Error updating purchase counter:", error);
-        res.status(500).send({ message: "Failed to update purchase counter." });
-    }
-});
-
 app.patch('/models/:id', verifyToken, async (req, res) => { 
     await connectDB();
     try {
         const id = req.params.id;
         const updatedData = req.body;
         const userUid = req.user.uid; 
-        const userEmail = req.user.email; 
         
-        if (!ObjectId.isValid(id)) {
-            return res.status(400).send({ message: "Invalid Model ID format." });
-        }
-
         const existingModel = await AIModelOne.findById(id);
-        if (!existingModel) {
-            return res.status(404).send({ message: "Model not found." });
-        }
+        if (!existingModel) return res.status(404).send({ message: "Not found." });
 
-        let isOwner = false;
-
-        if (existingModel.developerUid) {
-            if (existingModel.developerUid === userUid) {
-                isOwner = true;
-            }
-        } else {
-            if (existingModel.developerEmail === userEmail) {
-                isOwner = true;
-                await AIModelOne.updateOne({ _id: new ObjectId(id) }, { $set: { developerUid: userUid } });
-            }
-        }
-
-        if (!isOwner) {
-             return res.status(403).send({ message: "Forbidden: Only the model owner can update it." });
+        if (existingModel.developerUid !== userUid) {
+            return res.status(403).send({ message: "Forbidden: Not owner." });
         }
         
-        const filter = { _id: new ObjectId(id) }; 
-
-        const updateDoc = {
-            $set: {
-                modelName: updatedData.modelName,
-                name: updatedData.modelName, 
-                description: updatedData.description,
-                
-                price: updatedData.price !== undefined && updatedData.price !== null 
-                       ? parseFloat(updatedData.price) 
-                       : existingModel.price, 
-                
-                category: updatedData.category,
-                framework: updatedData.category,
-                imageUrl: updatedData.imageUrl, 
-                useCase: updatedData.useCase || existingModel.useCase, 
-                dataset: updatedData.dataset || existingModel.dataset,
-            }
-        };
-        
-        const result = await AIModelOne.updateOne(filter, updateDoc);
-        if (result.modifiedCount === 0) {
-            const updatedModel = await AIModelOne.findById(id);
-            if (updatedModel) {
-                 return res.send(updatedModel); 
-            }
-            return res.status(404).send({ message: "Update failed or model not found." });
-        }
-        
-        const updatedModel = await AIModelOne.findById(id);
-        res.send(updatedModel);
-
+        const result = await AIModelOne.updateOne({ _id: new ObjectId(id) }, { $set: updatedData });
+        res.send({ acknowledged: true, modifiedCount: result.modifiedCount });
     } catch (error) {
-        console.error("Error updating model:", error);
-        res.status(500).send({ message: "Failed to update model." });
+        res.status(500).send({ message: "Update failed." });
     }
 });
 
@@ -393,42 +240,15 @@ app.delete('/models/:id', verifyToken, async (req, res) => {
     try {
         const id = req.params.id;
         const userUid = req.user.uid; 
-        const userEmail = req.user.email;
-        
-        if (!ObjectId.isValid(id)) {
-            return res.status(400).send({ message: "Invalid Model ID format." });
-        }
-
         const existingModel = await AIModelOne.findById(id);
-        if (!existingModel) {
-            return res.status(404).send({ message: "Model not found." });
-        }
-
-        let isOwner = false;
-
-        if (existingModel.developerUid) {
-            if (existingModel.developerUid === userUid) {
-                isOwner = true;
-            }
-        } else if (existingModel.developerEmail === userEmail) {
-            isOwner = true;
-            await AIModelOne.updateOne({ _id: new ObjectId(id) }, { $set: { developerUid: userUid } });
-        }
-
-        if (!isOwner) {
-            return res.status(403).send({ message: "Forbidden: Only the model owner can delete it." });
-        }
+        
+        if (!existingModel) return res.status(404).send({ message: "Not found." });
+        if (existingModel.developerUid !== userUid) return res.status(403).send({ message: "Not owner." });
         
         const result = await AIModelOne.deleteOne({ _id: new ObjectId(id) }); 
-
-        if (result.deletedCount === 0) {
-            return res.status(404).send({ message: "Delete failed or model not found." });
-        }
         res.send({ acknowledged: true, deletedCount: result.deletedCount });
-
     } catch (error) {
-        console.error("Error deleting model:", error);
-        res.status(500).send({ message: "Failed to delete model." });
+        res.status(500).send({ message: "Delete failed." });
     }
 });
 
