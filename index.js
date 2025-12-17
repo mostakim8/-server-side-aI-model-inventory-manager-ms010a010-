@@ -9,13 +9,12 @@ dotenv.config();
 
 const app = express();
 
-// ⚠️ চূড়ান্ত সংশোধন: Firebase Admin Initialization (Vercel Optimized)
-// লোকাল ফাইল ফলব্যাক সম্পূর্ণরূপে বাদ দেওয়া হয়েছে।
+
 let firebaseInitialized = false;
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     try {
-        // Vercel Environment Variable থেকে JSON পার্স করে ক্রেডেনশিয়াল লোড করা হচ্ছে।
+       
         const serviceAccountConfig = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccountConfig)
@@ -23,20 +22,21 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
         firebaseInitialized = true;
         console.log("Firebase Admin initialized from Environment Variables.");
     } catch (e) {
-        // যদি JSON পার্স করতে বা initialize করতে সমস্যা হয়।
+        
         console.error("Firebase Admin Initialization FAILED (Environment Variable Error):", e.message);
     }
 } else {
-    // Vercel এ লোকাল ফাইল খোঁজার চেষ্টা বন্ধ করা হলো।
     console.warn("WARNING: Firebase Admin not initialized. Missing FIREBASE_SERVICE_ACCOUNT env var.");
 }
 
 
 // 🌐 CORS Configuration (Deployment Friendly)
-// Production URL কে পরিবেশের ভেরিয়েবল থেকে নেওয়ার জন্য আপডেট করা হয়েছে
+
 const allowedOrigins = [
-    'http://localhost:5173', // লোকাল ফ্রন্টএন্ড 
-    process.env.FRONTEND_URL, // Netlify/Vercel লাইভ ফ্রন্টএন্ড URL
+    'http://localhost:5173',  
+    // Netlify/Vercel
+    process.env.FRONTEND_URL,   
+    // frontend Url
     'http://localhost:5176',
     'http://127.0.0.1:5173',
     'http://localhost:5175', 
@@ -61,8 +61,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// 3. Token Verification Middleware 
-// ... (আপনার verifyToken ফাংশন অপরিবর্তিত)
+// Token Verification Middleware 
 const verifyToken = async (req, res, next) => {
     if (!firebaseInitialized) {
         return res.status(500).send({ message: 'Server Error: Firebase Admin not configured.' });
@@ -87,11 +86,10 @@ const verifyToken = async (req, res, next) => {
 
 
 // MongoDB Connection & Updated Schema 
-// ... (connectDB এবং Schema অপরিবর্তিত)
 let isConnected = false;
 
 const connectDB = async () => { 
-    if (isConnected) return; // Already connected
+    if (isConnected) return; 
 
     try {
         await mongoose.connect(process.env.DB_URI || 'mongodb://localhost:27017/ai_models_db'); 
@@ -130,9 +128,7 @@ const ModelSchema = new mongoose.Schema({
 
 const AIModelOne = mongoose.model('AIModel', ModelSchema);
 
-// ------------------- ROUTES -------------------
-// ... (সকল routes অপরিবর্তিত)
-
+//routes
 app.get('/', (req, res) => {
     res.send('AI Model Inventory Manager Server is running!');
 });
@@ -152,9 +148,10 @@ app.get('/models', async (req, res) => {
         }
         
         if (req.query.latest === 'true') {
-            sort.createdAt = -1; // Newest first
+            // Newest first
+            sort.createdAt = -1; 
         } else {
-             // 💡 price ফিল্ড না থাকায় default সর্টিং createdAt দিয়ে করা হলো
+            
              sort.createdAt = -1;
         }
         
@@ -175,7 +172,7 @@ app.get('/models', async (req, res) => {
 app.get('/models/latest', async (req, res) => {
     await connectDB();
     try {
-        // 💡 skipCount 3 এর পরিবর্তে 0 ব্যবহার করা হলো, যাতে লেটেস্ট মডেলগুলো স্লাইডারে দেখা যায়
+      
         const skipCount = parseInt(req.query.skip) || 0; 
         const limit = parseInt(req.query.limit) || 6; 
         
@@ -361,7 +358,6 @@ app.patch('/models/:id', verifyToken, async (req, res) => {
                 name: updatedData.modelName, 
                 description: updatedData.description,
                 
-                // 💡 price ফিল্ড না থাকলেও এটি সঠিক
                 price: updatedData.price !== undefined && updatedData.price !== null 
                        ? parseFloat(updatedData.price) 
                        : existingModel.price, 
@@ -436,5 +432,4 @@ app.delete('/models/:id', verifyToken, async (req, res) => {
     }
 });
 
-// ------------------- VERCEL EXPORT -------------------
 module.exports = app;
