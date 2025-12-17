@@ -65,7 +65,8 @@ const ModelSchema = new mongoose.Schema({
     description: { type: String, required: true },
     imageUrl: { type: String, required: true },
     developerEmail: { type: String, required: true },
-    developerUid: { type: String, required: true }, 
+    developerUid: { type: String, required: true },
+    developerName: { type: String, required: true },  
     purchased: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now } 
 });
