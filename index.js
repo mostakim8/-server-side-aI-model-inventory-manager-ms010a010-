@@ -20,7 +20,14 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
 }
 
 // CORS Settings
-const allowedOrigins = ['http://localhost:5173', process.env.FRONTEND_URL, 'http://localhost:5176', 'http://127.0.0.1:5173', 'http://localhost:5175', 'http://127.0.0.1:5175', 'http://localhost:5177'];
+const allowedOrigins = [
+    'http://localhost:5173', 
+    process.env.FRONTEND_URL, 
+    'http://localhost:5176', 
+    'http://127.0.0.1:5173',
+     'http://localhost:5175', 
+     'http://127.0.0.1:5175', 
+     'http://localhost:5177'];
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
@@ -64,8 +71,10 @@ const ModelSchema = new mongoose.Schema({
 });
 const AIModelOne = mongoose.model('AIModel', ModelSchema);
 
-// --- Routes ---
-
+//Routes
+app.get('/', (req, res) => {
+    res.send('AI Model Inventory Server is Running!');
+});
 app.get('/models', async (req, res) => {
     await connectDB();
     const query = req.query.category && req.query.category !== 'All' ? { category: req.query.category } : {};
@@ -87,7 +96,6 @@ app.get('/models/:id', async (req, res) => {
     res.send(model || { message: "Not Found" });
 });
 
-// ✅ সংশোধিত পারচেজ রুট (Duplicate Check logic)
 
 app.post('/purchase-model', verifyToken, async (req, res) => {
     await connectDB();
@@ -98,14 +106,14 @@ app.post('/purchase-model', verifyToken, async (req, res) => {
         const firestore = admin.firestore();
         const historyRef = firestore.collection('purchase').doc(buyerUid).collection('history');
         
-        // ডুপ্লিকেট চেক
+        // check duplicate
         const existing = await historyRef.where('modelId', '==', modelId).get();
-        if (!existing.empty) return res.status(400).send({ message: "You already own this model." });
+        if (!existing.empty) return res.status(400).send({ message: "You already bought this model." });
 
-        // MongoDB আপডেট
+        // MongoDB update
         const mongoRes = await AIModelOne.updateOne({ _id: new ObjectId(modelId) }, { $inc: { purchased: 1 } });
         
-        // Firestore সেভ
+        // Firestore save
         const purchaseRef = historyRef.doc(); 
         await purchaseRef.set({ id: purchaseRef.id, ...req.body, buyerUid, purchaseDate: new Date().toISOString() });
         
