@@ -25,9 +25,9 @@ const allowedOrigins = [
     process.env.FRONTEND_URL, 
     'http://localhost:5176', 
     'http://127.0.0.1:5173',
-     'http://localhost:5175', 
-     'http://127.0.0.1:5175', 
-     'http://localhost:5177'];
+    'http://localhost:5175', 
+    'http://127.0.0.1:5175', 
+    'http://localhost:5177'];
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
