@@ -133,5 +133,25 @@ app.delete('/models/:id', verifyToken, async (req, res) => {
     const result = await AIModelOne.deleteOne({ _id: new ObjectId(req.params.id), developerUid: req.user.uid });
     res.send(result);
 });
+app.post("/models", verifyToken, async (req, res) => {
+  await connectDB();
+  try {
+    const modelData = req.body;
+
+    // টোকেন থেকে পাওয়া ইউজার আইডি এবং নাম যোগ করা (নিরাপত্তার জন্য)
+    const newModel = new AIModelOne({
+      ...modelData,
+      developerUid: req.user.uid,
+      developerName: req.user.name || "Anonymous", // টোকেন থেকে নাম নেওয়া
+      createdAt: new Date(),
+    });
+
+    const result = await newModel.save();
+    res.status(201).send({ acknowledged: true, insertedId: result._id });
+  } catch (error) {
+    console.error("Post Error:", error.message);
+    res.status(500).send({ message: error.message });
+  }
+});
 
 module.exports = app;
