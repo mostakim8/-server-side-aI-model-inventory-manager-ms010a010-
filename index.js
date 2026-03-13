@@ -56,19 +56,30 @@ const connectDB = async () => {
 
 // Model Schema
 const ModelSchema = new mongoose.Schema({
-    modelName: { type: String, required: true },
-    category: { type: String, required: true },
-    name: { type: String, default: function() { return this.modelName; } }, 
-    framework: { type: String, default: function() { return this.category; } }, 
-    useCase: { type: String, default: 'General AI' },
-    dataset: { type: String, default: 'Proprietary Data' },
-    description: { type: String, required: true },
-    imageUrl: { type: String, required: true },
-    developerEmail: { type: String, required: true },
-    developerUid: { type: String, required: true },
-    developerName: { type: String, required: true },  
-    purchased: { type: Number, default: 0 },
-    createdAt: { type: Date, default: Date.now } 
+  modelName: { type: String, required: true },
+  category: { type: String, required: true },
+  name: {
+    type: String,
+    default: function () {
+      return this.modelName;
+    },
+  },
+  framework: {
+    type: String,
+    default: function () {
+      return this.category;
+    },
+  },
+  useCase: { type: String, default: "General AI" },
+  dataset: { type: String, default: "Proprietary Data" },
+  description: { type: String, required: true },
+  imageUrl: { type: String, required: true },
+  developerUid: { type: String, required: true },
+  developerImage:{type: String},
+  developerName: { type: String, required: true },
+  developerEmail: { type: String, required: true },
+  purchased: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now },
 });
 const AIModelOne = mongoose.model('AIModel', ModelSchema);
 
@@ -138,11 +149,11 @@ app.post("/models", verifyToken, async (req, res) => {
   try {
     const modelData = req.body;
 
-    // টোকেন থেকে পাওয়া ইউজার আইডি এবং নাম যোগ করা (নিরাপত্তার জন্য)
     const newModel = new AIModelOne({
       ...modelData,
       developerUid: req.user.uid,
-      developerName: req.user.name || "Anonymous", // টোকেন থেকে নাম নেওয়া
+      developerImage: req.user.picture,
+      developerName: req.user.name || "Anonymous", 
       createdAt: new Date(),
     });
 
